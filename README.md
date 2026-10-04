@@ -1,4 +1,4 @@
-# Less: svarbių laiškų atranka ir priminimai
+# PiEmail: svarbių laiškų atranka ir priminimai
 
 Kursinio darbo I dalis: projektavimo dokumentas
 
