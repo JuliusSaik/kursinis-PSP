@@ -200,3 +200,119 @@ Taip, naudojau Claude (Anthropic).
 | AI kaina | Analizuojami tik filtrą praėję laiškai, tekstas trumpinamas, pirmą kartą imami tik paskutinių 7 dienų laiškai |
 | Laiškų privatumas | Prašomos tik skaitymo ir užduočių teisės, laiško tekstas duomenų bazėje nesaugomas |
 
+
+## 8. Prototipas (II užduotis)
+
+Prototipas įgyvendina visą pagrindinį scenarijų: laiškų gavimas, filtras, AI analizė, atsakymo tikrinimas, prioriteto ir užduoties datos taisyklės, viena užduotis vienai gijai, klaidų apdorojimas ir pakartotinė analizė. Gmail ir Google Tasks šiame etape imituojami, todėl Google API raktų ar leidimų nereikia.
+
+### Reikalingi įrankiai
+
+| Įrankis | Versija |
+|---|---|
+| Node.js | 22.13 arba naujesnė (naudojamas įtaisytas `node:sqlite` modulis) |
+| npm | 10 arba naujesnė |
+
+Duomenų bazės serverio diegti nereikia: duomenys saugomi SQLite faile `data/runtime/piemail.db`.
+
+### Paleidimas
+
+```bash
+npm install
+cp .env.example .env    # neprivaloma, be .env naudojamos numatytosios reikšmės
+npm start
+```
+
+Programa pasiekiama adresu http://localhost:3000. Testai paleidžiami komanda `npm test`. Visi duomenys (DB, imituota pašto dėžutė ir užduotys) ištrinami komanda `npm run reset`, po jos kitas paleidimas vėl užkrauna pavyzdinius duomenis.
+
+### Konfigūracija (`.env`)
+
+| Kintamasis | Numatyta | Paskirtis |
+|---|---|---|
+| `PORT` | `3000` | Serverio prievadas |
+| `TIME_ZONE` | `Europe/Vilnius` | Laiko juosta, pagal kurią nustatoma šiandienos data |
+| `APP_TODAY` | tuščia | Fiksuota „šiandienos" data (`YYYY-MM-DD`), kad būtų galima atkartoti 3 skyriaus scenarijus |
+| `AI_PROVIDER` | `mock` | `mock` (raktinių žodžių klasifikatorius be API rakto) arba `openai` (tikras modelis) |
+| `OPENAI_API_KEY` | tuščia | OpenAI API raktas, reikalingas tik kai `AI_PROVIDER=openai` |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Naudojamas modelis |
+
+Tikro rakto į repozitoriją nekelkite: `.env` yra `.gitignore` sąraše, pavyzdys pateiktas `.env.example`.
+
+### Pavyzdiniai duomenys ir klientai
+
+Paruošti du klientai (`data/seed/tenants.json`), kiekvienas su savo pašto dėžute (`data/seed/mock-gmail.json`):
+
+| Klientas | Pašto dėžutė | Laiškai |
+|---|---|---|
+| UAB Ąžuolo baldai (`azuolo-baldai`) | info@azuolobaldai.test | stalviršių užsakymas, kainos užklausa, reklaminis naujienlaiškis (atmetamas filtru), paties naudotojo išsiųstas laiškas (atmetamas) |
+| Kirpykla Žirklės (`kirpykla-zirkles`) | labas@zirkles.test | sąskaita faktūra, prašymas perskambinti, socialinio tinklo pranešimas (atmetamas filtru) |
+
+Visi kliento duomenys DB lentelėse turi `tenant_id`, o kiekviena užklausa vykdoma konkretaus kliento kontekste (`/api/tenants/:tenantId/...`). Repozitorijų metodai be kliento ID neegzistuoja, todėl kito kliento laiško ar užduoties perskaityti ar pakeisti negalima net žinant jo ID.
+
+### Demonstravimo žingsniai
+
+1. `npm run reset`, `.env` faile `APP_TODAY=2026-10-05`, `npm start`.
+2. Pasirinkite klientą „UAB Ąžuolo baldai" ir paspauskite **Tikrinti laiškus**. Stalviršių užsakymas: kategorija užsakymas, 50 balų, lygis aukštas, užduotis `[Aukštas]` su data 2026-10-16. Naujienlaiškis ir išsiųstas laiškas atmesti filtru.
+3. Paspauskite **Tikrinti laiškus** dar kartą: naujų laiškų nėra, dublikatų neatsiranda.
+4. Sustabdykite serverį, nustatykite `APP_TODAY=2026-10-07`, paleiskite iš naujo. Formoje „Imituoti gautą laišką" pasirinkite giją „Atsakymas: Stalviršių užsakymas", tema `Re: Stalviršių užsakymas`, tekstas `Atsiprašau, stalviršių reikia jau rytoj, spalio 8 d.` Paspauskite **Tikrinti laiškus**: 90 balų, kritinis, ta pati užduotis gauna žymą `[Kritinis]` ir datą 2026-10-07. Užduočių sąraše vis dar viena užduotis šiai gijai.
+5. Klaidos atvejis: `.env` nustatykite `AI_PROVIDER=openai` ir neteisingą `OPENAI_API_KEY`, perkraukite serverį. Įdėkite laišką tema `Pasiūlymas`, tekstas `Laba diena, ar galėtumėte man paskambinti dėl jūsų pasiūlymo?` ir paspauskite **Tikrinti laiškus**. Programa nenulūžta, laiško būsena „Nepavyko analizuoti", užduotis nesukurta (užvedus pelę ant eilutės matoma klaidos priežastis).
+6. Atkurkite teisingą raktą (arba `AI_PROVIDER=mock`), perkraukite ir paspauskite **Tikrinti laiškus**: perskambinimas, 40 balų, aukštas, užduotis su kitos darbo dienos data.
+7. Klientų atskyrimas: perjunkite klientą į „Kirpykla Žirklės". Matomi tik šio kliento laiškai ir užduotys. Bandymas kito kliento kontekste skaityti laišką grąžina 404:
+   ```bash
+   curl -i http://localhost:3000/api/tenants/kirpykla-zirkles/emails/18c2f4a1
+   ```
+8. Užduoties ištrynimas telefone imituojamas mygtuku **Ištrinti**. Kitas tos gijos laiškas, kuriam reikia veiksmo, sukuria naują užduotį.
+9. `npm test` parodo testų rezultatus.
+
+### API
+
+| Metodas ir kelias | Paskirtis |
+|---|---|
+| `GET /api/tenants` | Klientų sąrašas |
+| `POST /api/tenants/:tenantId/check` | Tikrinti laiškus (filtras, analizė, užduotys) |
+| `GET /api/tenants/:tenantId/emails` | Išanalizuoti kliento laiškai |
+| `GET /api/tenants/:tenantId/emails/:messageId` | Vienas laiškas (404, jei priklauso kitam klientui) |
+| `GET /api/tenants/:tenantId/tasks` | Kliento užduotys Google Tasks |
+| `POST /api/tenants/:tenantId/mock/inbox` | Imituoti gautą laišką (`from`, `subject`, `body`, `threadId`) |
+| `DELETE /api/tenants/:tenantId/mock/tasks/:taskId` | Imituoti užduoties ištrynimą telefone |
+
+### Kodo struktūra
+
+```
+src/
+  analysis/        pagrindinis modulis: AI atsakymo tikrinimas, prioriteto ir datos taisyklės, sprendimas dėl užduoties
+  ai/              AI klasifikatoriai: MockClassifier ir OpenAiClassifier, instrukcija modeliui
+  mailbox/         laiškų tikrinimo eiga (MailboxChecker), filtras, teksto valymas
+  integrations/    imituoti Gmail ir Google Tasks klientai
+  storage/         SQLite schema ir repozitorijos
+  http/            Express maršrutai
+  server.js        priklausomybių sujungimas ir paleidimas
+public/            naudotojo sąsaja (HTML ir JavaScript)
+test/              Vitest testai
+```
+
+Pagrindinis modulis (`src/analysis`) nežino nieko apie HTTP, duomenų bazę ar konkrečias išorines paslaugas: jis gauna laišką, klasifikatorių ir šiandienos datą ir grąžina rezultatą. Todėl taisykles galima testuoti be AI, o tas pats AI atsakymas visada duoda tą patį rezultatą.
+
+### Testai
+
+| Failas | Kas tikrinama |
+|---|---|
+| `test/analysis.test.js` | Įprastas atvejis (užsakymas, 50 balų, data 2026-10-16), konfliktas (atnaujinimas, 90 balų, data nekeliama į praeitį), mažas užtikrintumas, AI paslaugos klaida, netinkami AI atsakymai (kategorija, neegzistuojanti data, užtikrintumas, sugadintas JSON), prioriteto ribos, darbo dienos |
+| `test/mailboxChecker.test.js` | Viena užduotis gijai, pakartotinis tikrinimas be dublikatų, nepavykusios analizės kartojimas, ištrintos užduoties atkūrimas, atsakymas be veiksmo nekeičia užduoties |
+| `test/tenantIsolation.test.js` | Vienas klientas negali perskaityti kito kliento laiškų, ištrinti jo užduoties, o ta pati gijos ID skirtingiems klientams sukuria atskiras užduotis |
+
+### Tikrų Google paslaugų prijungimas
+
+Gmail ir Google Tasks klientai kuriami `src/server.js` per gamyklas `mockGmailFor(tenant)` ir `tasksClientFor(tenant)`. Norint prijungti tikras paslaugas, pakanka parašyti klasę su tais pačiais metodais ir ją grąžinti iš gamyklos:
+
+| Klientas | Metodai |
+|---|---|
+| Laiškai | `listMessagesSince(isoTime)`, `getMessage(id)`; laiškas: `{ id, threadId, from, subject, body, receivedAt, labels, hasListUnsubscribe }` |
+| Užduotys | `listTasks()`, `taskExists(id)`, `createTask({ title, due, notes })`, `updateTask(id, { title, due })` |
+
+### Nukrypimai nuo I etapo plano
+
+| Planuota | Prototipe | Priežastis |
+|---|---|---|
+| PostgreSQL | SQLite (`node:sqlite`) | Paleidimas viena komanda be papildomo serverio. Schema ir unikalumo apribojimai tie patys, keičiasi tik `src/storage` |
+| React sąsaja | Paprastas HTML ir JavaScript puslapis | Prototipui pakanka vieno puslapio, nereikia atskiro sąsajos surinkimo |
+| Gmail ir Google Tasks API, Google prisijungimas | Imituoti klientai su tuo pačiu sąsajos kontraktu | Nereikia Google raktų ir leidimų; prisijungimas numatytas III etapui |

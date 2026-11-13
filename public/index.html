@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="lt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PiEmail</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>PiEmail</h1>
+    <p id="info" class="muted"></p>
+  </header>
+
+  <main>
+    <section class="toolbar">
+      <label>
+        Klientas
+        <select id="tenant"></select>
+      </label>
+      <button id="check">Tikrinti laiškus</button>
+      <span id="status" class="muted"></span>
+    </section>
+
+    <section>
+      <h2>Išanalizuoti laiškai</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Gauta</th><th>Siuntėjas</th><th>Tema</th><th>Kategorija</th><th>Balai</th>
+            <th>Prioritetas</th><th>Terminas</th><th>Užduoties data</th><th>Būsena</th>
+          </tr>
+        </thead>
+        <tbody id="emails"></tbody>
+      </table>
+    </section>
+
+    <div class="columns">
+      <section>
+        <h2>Google Tasks <span class="muted">(imitacija)</span></h2>
+        <ul id="tasks"></ul>
+      </section>
+
+      <section>
+        <h2>Imituoti gautą laišką</h2>
+        <form id="incoming">
+          <label>Siuntėjas <input name="from" type="email" value="jonas@gmail.com" required></label>
+          <label>Tema <input name="subject" required></label>
+          <label>Gija
+            <select name="threadId"><option value="">Nauja gija</option></select>
+          </label>
+          <label>Tekstas <textarea name="body" rows="4" required></textarea></label>
+          <button type="submit">Įdėti į pašto dėžutę</button>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
