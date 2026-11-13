@@ -51,5 +51,5 @@ th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--bord
 .status-analysis_failed, .status-task_failed { color: var(--critical); }
 .status-needs_review { color: var(--high); }
 
-#tasks { list-style: none; padding: 0; margin: 0; }
-#tasks li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.tasks { list-style: none; padding: 0; margin: 0; }
+.tasks li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }

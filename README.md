@@ -222,7 +222,7 @@ cp .env.example .env    # neprivaloma, be .env naudojamos numatytosios reikšmė
 npm start
 ```
 
-Programa pasiekiama adresu http://localhost:3000. Testai paleidžiami komanda `npm test`. Visi duomenys (DB, imituota pašto dėžutė ir užduotys) ištrinami komanda `npm run reset`, po jos kitas paleidimas vėl užkrauna pavyzdinius duomenis.
+`npm start` surenka React sąsają (Vite) ir paleidžia Express serverį, kuris ją pateikia. Programa pasiekiama adresu http://localhost:3000. Kuriant sąsają galima naudoti `npm run dev` (Vite kūrimo serveris su automatiniu atnaujinimu, API užklausas persiunčia į veikiantį serverį prievadu 3000). Testai paleidžiami komanda `npm test`. Visi duomenys (DB, imituota pašto dėžutė ir užduotys) ištrinami komanda `npm run reset`, po jos kitas paleidimas vėl užkrauna pavyzdinius duomenis.
 
 ### Konfigūracija (`.env`)
 
@@ -286,7 +286,7 @@ src/
   storage/         SQLite schema ir repozitorijos
   http/            Express maršrutai
   server.js        priklausomybių sujungimas ir paleidimas
-public/            naudotojo sąsaja (HTML ir JavaScript)
+client/            React sąsaja (Vite): App.jsx, komponentai, API klientas
 test/              Vitest testai
 ```
 
@@ -314,5 +314,4 @@ Gmail ir Google Tasks klientai kuriami `src/server.js` per gamyklas `mockGmailFo
 | Planuota | Prototipe | Priežastis |
 |---|---|---|
 | PostgreSQL | SQLite (`node:sqlite`) | Paleidimas viena komanda be papildomo serverio. Schema ir unikalumo apribojimai tie patys, keičiasi tik `src/storage` |
-| React sąsaja | Paprastas HTML ir JavaScript puslapis | Prototipui pakanka vieno puslapio, nereikia atskiro sąsajos surinkimo |
 | Gmail ir Google Tasks API, Google prisijungimas | Imituoti klientai su tuo pačiu sąsajos kontraktu | Nereikia Google raktų ir leidimų; prisijungimas numatytas III etapui |

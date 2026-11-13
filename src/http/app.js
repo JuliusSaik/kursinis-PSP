@@ -20,7 +20,7 @@ function requireText(body, fields) {
 export function createApp({ tenants, emails, mailboxChecker, tasksClientFor, mockGmailFor, info }) {
   const app = express();
   app.use(express.json());
-  app.use(express.static(path.resolve('public')));
+  app.use(express.static(path.resolve('client/dist')));
 
   app.get('/api/info', (req, res) => res.json(info()));
   app.get('/api/tenants', (req, res) => res.json(tenants.list()));
