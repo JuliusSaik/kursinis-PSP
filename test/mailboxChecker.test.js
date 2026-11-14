@@ -20,11 +20,11 @@ describe('MailboxChecker', () => {
     });
     const tasks = system.tasksClientFor(TENANT_A);
 
-    const first = await system.mailboxChecker.check(TENANT_A);
+    const first = await system.check(TENANT_A);
     expect(first.filteredOut).toBe(1);
     expect(first.processed).toHaveLength(1);
 
-    const repeated = await system.mailboxChecker.check(TENANT_A);
+    const repeated = await system.check(TENANT_A);
     expect(repeated.processed).toHaveLength(0);
 
     system.clock.currentDay = '2026-10-07';
@@ -34,7 +34,7 @@ describe('MailboxChecker', () => {
       body: 'Atsiprašau, stalviršių reikia jau rytoj, spalio 8 d.',
       threadId: 'thread-1',
     });
-    const reply = await system.mailboxChecker.check(TENANT_A);
+    const reply = await system.check(TENANT_A);
 
     expect(reply.processed[0]).toMatchObject({ status: 'task_updated', priority: 'kritinis', score: 90 });
     expect(await tasks.listTasks()).toEqual([
@@ -52,12 +52,12 @@ describe('MailboxChecker', () => {
     const callback = inboxEmail({ subject: 'Pasiūlymas', body: 'Laba diena, ar galėtumėte man paskambinti dėl jūsų pasiūlymo?' });
     const system = createTestSystem({ classifier, inbox: { [TENANT_A.id]: [callback] } });
 
-    const failed = await system.mailboxChecker.check(TENANT_A);
+    const failed = await system.check(TENANT_A);
     expect(failed.processed[0]).toMatchObject({ status: 'analysis_failed', taskId: null });
     expect(await system.tasksClientFor(TENANT_A).listTasks()).toHaveLength(0);
 
     aiAvailable = true;
-    const retried = await system.mailboxChecker.check(TENANT_A);
+    const retried = await system.check(TENANT_A);
 
     expect(retried.processed[0]).toMatchObject({
       status: 'task_created',
@@ -72,7 +72,7 @@ describe('MailboxChecker', () => {
   it('creates a new task when the linked one was deleted on the phone', async () => {
     const system = createTestSystem({ classifier: new MockClassifier(), inbox: { [TENANT_A.id]: [inboxEmail()] } });
     const tasks = system.tasksClientFor(TENANT_A);
-    await system.mailboxChecker.check(TENANT_A);
+    await system.check(TENANT_A);
     const [original] = await tasks.listTasks();
     await tasks.deleteTask(original.id);
 
@@ -82,7 +82,7 @@ describe('MailboxChecker', () => {
       body: 'Gal galite užsakymą pristatyti iki spalio 22 d.?',
       threadId: 'thread-1',
     });
-    const result = await system.mailboxChecker.check(TENANT_A);
+    const result = await system.check(TENANT_A);
 
     expect(result.processed[0].status).toBe('task_created');
     const remaining = await tasks.listTasks();
@@ -92,7 +92,7 @@ describe('MailboxChecker', () => {
 
   it('leaves the thread task unchanged when a reply needs no action', async () => {
     const system = createTestSystem({ classifier: new MockClassifier(), inbox: { [TENANT_A.id]: [inboxEmail()] } });
-    await system.mailboxChecker.check(TENANT_A);
+    await system.check(TENANT_A);
     const before = await system.tasksClientFor(TENANT_A).listTasks();
 
     system.mockGmailFor(TENANT_A).deliver({
@@ -101,7 +101,7 @@ describe('MailboxChecker', () => {
       body: 'Ačiū, viskas aišku.',
       threadId: 'thread-1',
     });
-    const result = await system.mailboxChecker.check(TENANT_A);
+    const result = await system.check(TENANT_A);
 
     expect(result.processed[0].status).toBe('no_action');
     expect(await system.tasksClientFor(TENANT_A).listTasks()).toEqual(before);

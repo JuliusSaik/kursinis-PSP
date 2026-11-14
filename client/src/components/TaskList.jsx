@@ -10,7 +10,7 @@ export default function TaskList({ tasks, onDelete }) {
           <span>{task.due} {task.title}</span>
           <button
             className="secondary"
-            title="Imituoja užduoties ištrynimą telefone"
+            title="Ištrina užduotį (kaip ištrynus telefone)"
             onClick={() => onDelete(task.id)}
           >
             Ištrinti

@@ -5,20 +5,23 @@ async function request(url, options = {}) {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.error ?? `HTTP ${response.status}`);
+    const error = new Error(body.error ?? `HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
   return response.status === 204 ? null : response.json();
 }
 
-const tenantUrl = (tenantId, path) => `/api/tenants/${tenantId}${path}`;
-
 export const api = {
   getInfo: () => request('/api/info'),
-  getTenants: () => request('/api/tenants'),
-  getEmails: (tenantId) => request(tenantUrl(tenantId, '/emails')),
-  getTasks: (tenantId) => request(tenantUrl(tenantId, '/tasks')),
-  checkMailbox: (tenantId) => request(tenantUrl(tenantId, '/check'), { method: 'POST' }),
-  deliverEmail: (tenantId, email) =>
-    request(tenantUrl(tenantId, '/mock/inbox'), { method: 'POST', body: JSON.stringify(email) }),
-  deleteTask: (tenantId, taskId) => request(tenantUrl(tenantId, `/mock/tasks/${taskId}`), { method: 'DELETE' }),
+  getSession: () => request('/api/session'),
+  demoLogin: (tenantId) => request(`/auth/demo/${tenantId}`, { method: 'POST' }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  getEmails: () => request('/api/emails'),
+  getTasks: () => request('/api/tasks'),
+  checkMailbox: () => request('/api/check', { method: 'POST' }),
+  deliverEmail: (email) => request('/api/mock/inbox', { method: 'POST', body: JSON.stringify(email) }),
+  deleteTask: (taskId) => request(`/api/tasks/${taskId}`, { method: 'DELETE' }),
 };
+
+export const GOOGLE_LOGIN_URL = '/auth/google';

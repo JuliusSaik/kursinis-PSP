@@ -6,7 +6,8 @@ const SCHEMA = `
   CREATE TABLE IF NOT EXISTS tenants (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    mailbox_address TEXT NOT NULL
+    mailbox_address TEXT NOT NULL,
+    auth_provider TEXT NOT NULL CHECK (auth_provider IN ('demo', 'google'))
   );
 
   CREATE TABLE IF NOT EXISTS processed_emails (

@@ -12,18 +12,14 @@ const STATUS_BY_DECISION = {
 };
 
 export class MailboxChecker {
-  constructor({ emails, classifier, clock, mailClientFor, tasksClientFor }) {
+  constructor({ emails, classifier, clock }) {
     this.emails = emails;
     this.classifier = classifier;
     this.clock = clock;
-    this.mailClientFor = mailClientFor;
-    this.tasksClientFor = tasksClientFor;
   }
 
-  async check(tenant) {
+  async check(tenant, { mail, tasks }) {
     const startedAt = this.clock.now().toISOString();
-    const mail = this.mailClientFor(tenant);
-    const tasks = this.tasksClientFor(tenant);
 
     const candidates = await this.#collectCandidates(tenant, mail);
     const relevant = candidates.filter((email) => isRelevantEmail(email, tenant.mailboxAddress));

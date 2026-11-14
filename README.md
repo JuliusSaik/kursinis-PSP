@@ -203,7 +203,16 @@ Taip, naudojau Claude (Anthropic).
 
 ## 8. Prototipas (II užduotis)
 
-Prototipas įgyvendina visą pagrindinį scenarijų: laiškų gavimas, filtras, AI analizė, atsakymo tikrinimas, prioriteto ir užduoties datos taisyklės, viena užduotis vienai gijai, klaidų apdorojimas ir pakartotinė analizė. Gmail ir Google Tasks šiame etape imituojami, todėl Google API raktų ar leidimų nereikia.
+Prototipas įgyvendina visą pagrindinį scenarijų: prisijungimas, laiškų gavimas, filtras, AI analizė, atsakymo tikrinimas, prioriteto ir užduoties datos taisyklės, viena užduotis vienai gijai, klaidų apdorojimas ir pakartotinė analizė.
+
+Yra dvi klientų rūšys:
+
+| Klientas | Prisijungimas | Laiškai ir užduotys |
+|---|---|---|
+| Google klientas | Tikras Google prisijungimas (OAuth 2.0) | Tikras Gmail (tik skaitymas) ir tikras Google Tasks sąrašas „PiEmail" |
+| Demonstracinis klientas | Mygtukas prisijungimo puslapyje | Imituota pašto dėžutė ir užduotys (`data/runtime/*.json`), Google paskyros nereikia |
+
+Laiškus analizuoja pasirinktas AI tiekėjas: Google Gemini (`gemini-3.5-flash-lite`, yra nemokamas planas) arba Anthropic Claude (`claude-haiku-5-5`). Tiekėjas keičiamas vienu `.env` kintamuoju `AI_PROVIDER`, kodas nesikeičia. Be rakto galima naudoti raktinių žodžių klasifikatorių (`AI_PROVIDER=mock`).
 
 ### Reikalingi įrankiai
 
@@ -211,6 +220,8 @@ Prototipas įgyvendina visą pagrindinį scenarijų: laiškų gavimas, filtras, 
 |---|---|
 | Node.js | 22.13 arba naujesnė (naudojamas įtaisytas `node:sqlite` modulis) |
 | npm | 10 arba naujesnė |
+| Gemini arba Anthropic API raktas | reikalingas tik `AI_PROVIDER=gemini` arba `claude` |
+| Google Cloud projektas su OAuth klientu | reikalingas tik Google prisijungimui |
 
 Duomenų bazės serverio diegti nereikia: duomenys saugomi SQLite faile `data/runtime/piemail.db`.
 
@@ -218,11 +229,33 @@ Duomenų bazės serverio diegti nereikia: duomenys saugomi SQLite faile `data/ru
 
 ```bash
 npm install
-cp .env.example .env    # neprivaloma, be .env naudojamos numatytosios reikšmės
+cp .env.example .env    # užpildykite raktus; be jų veikia demonstraciniai klientai ir mock AI
 npm start
 ```
 
-`npm start` surenka React sąsają (Vite) ir paleidžia Express serverį, kuris ją pateikia. Programa pasiekiama adresu http://localhost:3000. Kuriant sąsają galima naudoti `npm run dev` (Vite kūrimo serveris su automatiniu atnaujinimu, API užklausas persiunčia į veikiantį serverį prievadu 3000). Testai paleidžiami komanda `npm test`. Visi duomenys (DB, imituota pašto dėžutė ir užduotys) ištrinami komanda `npm run reset`, po jos kitas paleidimas vėl užkrauna pavyzdinius duomenis.
+`npm start` surenka React sąsają (Vite) ir paleidžia Express serverį, kuris pateikia ir API, ir sąsają adresu http://localhost:3000.
+
+Kuriant sąsają serveris ir sąsaja paleidžiami atskirai, dviejuose terminaluose:
+
+```bash
+node --env-file-if-exists=.env src/server.js   # API, prievadas 3000
+npm run dev                                   # Vite, http://localhost:5173, /api ir /auth persiunčiami į 3000
+```
+
+Naudojant Google prisijungimą per Vite, `.env` nustatykite `PUBLIC_URL=http://localhost:5173`.
+
+Testai paleidžiami komanda `npm test`. Visi duomenys ištrinami komanda `npm run reset`. Ją būtina paleisti ir atnaujinus prototipą iš ankstesnės versijos, nes pasikeitė `tenants` lentelė.
+
+### Google Cloud nustatymas
+
+1. https://console.cloud.google.com sukurkite projektą.
+2. **APIs & Services → Library**: įjunkite **Gmail API** ir **Google Tasks API**.
+3. **Google Auth Platform → Branding**: įveskite programos pavadinimą ir kontaktinį el. paštą. **Audience**: tipas **External**, būsena **Testing**, į **Test users** įtraukite Gmail paskyras, kuriomis jungsitės.
+4. **Data Access → Add or remove scopes**: `openid`, `.../auth/userinfo.email`, `.../auth/gmail.readonly`, `.../auth/tasks`.
+5. **Clients → Create client**: tipas **Web application**, **Authorized redirect URIs**: `http://localhost:3000/auth/google/callback` (ir `http://localhost:5173/auth/google/callback`, jei naudojate Vite).
+6. Client ID ir Client secret įrašykite į `.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), o paskyras į `GOOGLE_ACCOUNTS=pirmas@gmail.com,antras@gmail.com`.
+
+Paprastas API raktas (API key) čia netinka: jis neleidžia skaityti naudotojo laiškų ar kurti jo užduočių, tam reikia naudotojo sutikimo per OAuth. Kol programa būsenoje „Testing", prisijungti gali tik įtraukti testiniai naudotojai, o Google parodo įspėjimą „Google hasn't verified this app" (spauskite **Continue**).
 
 ### Konfigūracija (`.env`)
 
@@ -231,87 +264,103 @@ npm start
 | `PORT` | `3000` | Serverio prievadas |
 | `TIME_ZONE` | `Europe/Vilnius` | Laiko juosta, pagal kurią nustatoma šiandienos data |
 | `APP_TODAY` | tuščia | Fiksuota „šiandienos" data (`YYYY-MM-DD`), kad būtų galima atkartoti 3 skyriaus scenarijus |
-| `AI_PROVIDER` | `mock` | `mock` (raktinių žodžių klasifikatorius be API rakto) arba `openai` (tikras modelis) |
-| `OPENAI_API_KEY` | tuščia | OpenAI API raktas, reikalingas tik kai `AI_PROVIDER=openai` |
-| `OPENAI_MODEL` | `gpt-4o-mini` | Naudojamas modelis |
+| `SESSION_SECRET` | kūrimo reikšmė | Sesijos slapuko parašo raktas |
+| `AI_PROVIDER` | `mock` | `mock` (raktinių žodžių klasifikatorius), `gemini` arba `claude` |
+| `AI_MODEL` | tuščia | Modelio pakeitimas; tuščia reiškia tiekėjo numatytąjį (`gemini-3.5-flash-lite`, `claude-haiku-5-5`) |
+| `GEMINI_API_KEY` | tuščia | Gemini API raktas (https://aistudio.google.com/apikey), reikalingas kai `AI_PROVIDER=gemini` |
+| `ANTHROPIC_API_KEY` | tuščia | Anthropic API raktas (https://console.anthropic.com), reikalingas kai `AI_PROVIDER=claude` |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | tuščia | Google OAuth klientas; be jų Google prisijungimas išjungtas |
+| `GOOGLE_ACCOUNTS` | tuščia | Kableliais atskirtos Google paskyros, užregistruotos kaip klientai |
+| `PUBLIC_URL` | `http://localhost:3000` | Adresas naršyklėje; iš jo sudaromas OAuth grįžimo adresas |
+| `DEMO_LOGIN` | `true` | Rodyti demonstracinius klientus prisijungimo puslapyje |
 
-Tikro rakto į repozitoriją nekelkite: `.env` yra `.gitignore` sąraše, pavyzdys pateiktas `.env.example`.
+Tikrų raktų į repozitoriją nekelkite: `.env` yra `.gitignore` sąraše, pavyzdys pateiktas `.env.example`.
 
-### Pavyzdiniai duomenys ir klientai
+### Klientai ir jų atskyrimas
 
-Paruošti du klientai (`data/seed/tenants.json`), kiekvienas su savo pašto dėžute (`data/seed/mock-gmail.json`):
+Klientas yra viena verslo pašto dėžutė. Savarankiškos registracijos nėra: Google klientai užregistruojami `GOOGLE_ACCOUNTS` kintamuoju, demonstraciniai paruošti `data/seed/tenants.json`:
 
 | Klientas | Pašto dėžutė | Laiškai |
 |---|---|---|
 | UAB Ąžuolo baldai (`azuolo-baldai`) | info@azuolobaldai.test | stalviršių užsakymas, kainos užklausa, reklaminis naujienlaiškis (atmetamas filtru), paties naudotojo išsiųstas laiškas (atmetamas) |
 | Kirpykla Žirklės (`kirpykla-zirkles`) | labas@zirkles.test | sąskaita faktūra, prašymas perskambinti, socialinio tinklo pranešimas (atmetamas filtru) |
 
-Visi kliento duomenys DB lentelėse turi `tenant_id`, o kiekviena užklausa vykdoma konkretaus kliento kontekste (`/api/tenants/:tenantId/...`). Repozitorijų metodai be kliento ID neegzistuoja, todėl kito kliento laiško ar užduoties perskaityti ar pakeisti negalima net žinant jo ID.
+Atskyrimą užtikrina serveris:
+
+- Prisijungus serveris sesijoje (atmintyje) išsaugo kliento ID ir Google prieigos raktus; naršyklė gauna tik sesijos slapuką (`httpOnly`). Atskiro JWT nėra.
+- API keliuose (`/api/emails`, `/api/tasks`, ...) kliento ID nėra: jis visada imamas iš sesijos, todėl pakeitus URL ar ID kito kliento duomenų pasiekti negalima. Neprisijungus grąžinama 401.
+- Visi kliento duomenys DB lentelėse turi `tenant_id`, o repozitorijų metodai be kliento ID neegzistuoja.
+- Google kliento laiškai ir užduotys skaitomi su jo paties OAuth raktu, todėl ir Google pusėje matomi tik jo duomenys. Užduotys kuriamos atskirame sąraše „PiEmail", asmeninės užduotys nerodomos ir nekeičiamos.
+- Prisijungus Google paskyra, kuri nėra užregistruota, sesija nesukuriama.
 
 ### Demonstravimo žingsniai
 
+Demonstraciniai klientai (be Google):
+
 1. `npm run reset`, `.env` faile `APP_TODAY=2026-10-05`, `npm start`.
-2. Pasirinkite klientą „UAB Ąžuolo baldai" ir paspauskite **Tikrinti laiškus**. Stalviršių užsakymas: kategorija užsakymas, 50 balų, lygis aukštas, užduotis `[Aukštas]` su data 2026-10-16. Naujienlaiškis ir išsiųstas laiškas atmesti filtru.
+2. Prisijungimo puslapyje pasirinkite „UAB Ąžuolo baldai" ir paspauskite **Tikrinti laiškus**. Stalviršių užsakymas: kategorija užsakymas, 50 balų, lygis aukštas, užduotis `[Aukštas]` su data 2026-10-16. Naujienlaiškis ir išsiųstas laiškas atmesti filtru.
 3. Paspauskite **Tikrinti laiškus** dar kartą: naujų laiškų nėra, dublikatų neatsiranda.
-4. Sustabdykite serverį, nustatykite `APP_TODAY=2026-10-07`, paleiskite iš naujo. Formoje „Imituoti gautą laišką" pasirinkite giją „Atsakymas: Stalviršių užsakymas", tema `Re: Stalviršių užsakymas`, tekstas `Atsiprašau, stalviršių reikia jau rytoj, spalio 8 d.` Paspauskite **Tikrinti laiškus**: 90 balų, kritinis, ta pati užduotis gauna žymą `[Kritinis]` ir datą 2026-10-07. Užduočių sąraše vis dar viena užduotis šiai gijai.
-5. Klaidos atvejis: `.env` nustatykite `AI_PROVIDER=openai` ir neteisingą `OPENAI_API_KEY`, perkraukite serverį. Įdėkite laišką tema `Pasiūlymas`, tekstas `Laba diena, ar galėtumėte man paskambinti dėl jūsų pasiūlymo?` ir paspauskite **Tikrinti laiškus**. Programa nenulūžta, laiško būsena „Nepavyko analizuoti", užduotis nesukurta (užvedus pelę ant eilutės matoma klaidos priežastis).
-6. Atkurkite teisingą raktą (arba `AI_PROVIDER=mock`), perkraukite ir paspauskite **Tikrinti laiškus**: perskambinimas, 40 balų, aukštas, užduotis su kitos darbo dienos data.
-7. Klientų atskyrimas: perjunkite klientą į „Kirpykla Žirklės". Matomi tik šio kliento laiškai ir užduotys. Bandymas kito kliento kontekste skaityti laišką grąžina 404:
-   ```bash
-   curl -i http://localhost:3000/api/tenants/kirpykla-zirkles/emails/18c2f4a1
-   ```
-8. Užduoties ištrynimas telefone imituojamas mygtuku **Ištrinti**. Kitas tos gijos laiškas, kuriam reikia veiksmo, sukuria naują užduotį.
-9. `npm test` parodo testų rezultatus.
+4. Sustabdykite serverį, nustatykite `APP_TODAY=2026-10-07`, paleiskite iš naujo. Formoje „Imituoti gautą laišką" pasirinkite giją „Atsakymas: Stalviršių užsakymas", tema `Re: Stalviršių užsakymas`, tekstas `Atsiprašau, stalviršių reikia jau rytoj, spalio 8 d.` Paspauskite **Tikrinti laiškus**: 90 balų, kritinis, ta pati užduotis gauna žymą `[Kritinis]` ir datą 2026-10-07.
+5. Klaidos atvejis: `.env` nustatykite `AI_PROVIDER=gemini` ir neteisingą `GEMINI_API_KEY`, perkraukite serverį. Įdėkite laišką tema `Pasiūlymas`, tekstas `Laba diena, ar galėtumėte man paskambinti dėl jūsų pasiūlymo?` ir paspauskite **Tikrinti laiškus**. Programa nenulūžta, laiško būsena „Nepavyko analizuoti" (užvedus pelę matoma priežastis, pvz. `HTTP 400`), užduotis nesukurta.
+6. Įrašykite teisingą raktą, perkraukite ir paspauskite **Tikrinti laiškus**: laišką išanalizuoja AI modelis, sukuriama perskambinimo užduotis. Tą patį galima pakartoti su `AI_PROVIDER=claude`.
+7. Atsijunkite ir prisijunkite kaip „Kirpykla Žirklės": matomi tik šio kliento laiškai ir užduotys.
+
+Tikras Google klientas:
+
+8. `.env` nustatykite Google raktus, `GOOGLE_ACCOUNTS`, `AI_PROVIDER=gemini` (arba `claude`), `APP_TODAY` palikite tuščią. Iš kitos paskyros nusiųskite į registruotą Gmail laišką, pvz. `Ar galėtumėte man paskambinti rytoj?`.
+9. Paspauskite **Prisijungti su Google**, sutikite su leidimais, paspauskite **Tikrinti laiškus**. Pirmą kartą imami paskutinių 7 dienų laiškai (iki 25). Užduotis atsiranda Google Tasks sąraše „PiEmail" (telefone ar https://tasks.google.com).
+10. Atsijunkite ir prisijunkite antra registruota paskyra: pirmos paskyros laiškų ir užduočių nesimato. Prisijungus neregistruota paskyra rodoma klaida „Ši Google paskyra nėra užregistruota".
+11. `npm test` parodo testų rezultatus.
 
 ### API
 
 | Metodas ir kelias | Paskirtis |
 |---|---|
-| `GET /api/tenants` | Klientų sąrašas |
-| `POST /api/tenants/:tenantId/check` | Tikrinti laiškus (filtras, analizė, užduotys) |
-| `GET /api/tenants/:tenantId/emails` | Išanalizuoti kliento laiškai |
-| `GET /api/tenants/:tenantId/emails/:messageId` | Vienas laiškas (404, jei priklauso kitam klientui) |
-| `GET /api/tenants/:tenantId/tasks` | Kliento užduotys Google Tasks |
-| `POST /api/tenants/:tenantId/mock/inbox` | Imituoti gautą laišką (`from`, `subject`, `body`, `threadId`) |
-| `DELETE /api/tenants/:tenantId/mock/tasks/:taskId` | Imituoti užduoties ištrynimą telefone |
+| `GET /auth/google`, `GET /auth/google/callback` | Google prisijungimas (OAuth 2.0 su `state` patikra) |
+| `POST /auth/demo/:tenantId` | Prisijungimas demonstraciniu klientu (403 Google klientui) |
+| `POST /auth/logout` | Atsijungimas |
+| `GET /api/session` | Prisijungęs klientas ir galimi prisijungimo būdai |
+| `POST /api/check` | Tikrinti laiškus (filtras, analizė, užduotys) |
+| `GET /api/emails`, `GET /api/emails/:messageId` | Išanalizuoti kliento laiškai (404, jei laiškas kito kliento) |
+| `GET /api/tasks`, `DELETE /api/tasks/:taskId` | Kliento užduotys, užduoties ištrynimas |
+| `POST /api/mock/inbox` | Imituoti gautą laišką (tik demonstraciniams klientams) |
+
+Visi `/api` keliai, išskyrus `/api/info` ir `/api/session`, reikalauja prisijungimo.
 
 ### Kodo struktūra
 
 ```
 src/
   analysis/        pagrindinis modulis: AI atsakymo tikrinimas, prioriteto ir datos taisyklės, sprendimas dėl užduoties
-  ai/              AI klasifikatoriai: MockClassifier ir OpenAiClassifier, instrukcija modeliui
+  ai/              AI klasifikatoriai (Mock, Gemini, Claude), tiekėjo pasirinkimas, bendra instrukcija ir JSON schema
+  auth/            Google OAuth 2.0 prisijungimas
   mailbox/         laiškų tikrinimo eiga (MailboxChecker), filtras, teksto valymas
-  integrations/    imituoti Gmail ir Google Tasks klientai
+  integrations/    Gmail ir Google Tasks klientai: tikri (Google API) ir imituoti
   storage/         SQLite schema ir repozitorijos
-  http/            Express maršrutai
+  http/            Express maršrutai, sesija, prieigos patikra
   server.js        priklausomybių sujungimas ir paleidimas
-client/            React sąsaja (Vite): App.jsx, komponentai, API klientas
+client/            React sąsaja (Vite): prisijungimo puslapis, darbo langas, API klientas
 test/              Vitest testai
 ```
 
-Pagrindinis modulis (`src/analysis`) nežino nieko apie HTTP, duomenų bazę ar konkrečias išorines paslaugas: jis gauna laišką, klasifikatorių ir šiandienos datą ir grąžina rezultatą. Todėl taisykles galima testuoti be AI, o tas pats AI atsakymas visada duoda tą patį rezultatą.
+Pagrindinis modulis (`src/analysis`) nežino nieko apie HTTP, duomenų bazę ar konkrečias išorines paslaugas: jis gauna laišką, klasifikatorių ir šiandienos datą ir grąžina rezultatą. `MailboxChecker` kiekvienam tikrinimui gauna kliento laiškų ir užduočių klientus, todėl ta pati eiga veikia ir su tikru Google, ir su imitacija.
+
+AI tiekėjai keičiami nekeičiant kodo. Kiekvienas klasifikatorius turi vieną metodą `classify(email, { today })`, kuris grąžina modelio JSON atsakymą, o bet kokią tiekėjo klaidą paverčia `AiServiceError`. Instrukcija modeliui ir atsakymo JSON schema bendros (`src/ai/prompt.js`), tiekėjas parenkamas `src/ai/createClassifier.js` pagal `AI_PROVIDER`. Naujam tiekėjui pakanka vienos klasės ir vieno įrašo šiame faile. Atsakymą riboja JSON schema, bet jis vis tiek tikrinamas `validateAiResponse`. API klaidos, atsisakymas atsakyti ar nutrūkęs atsakymas paverčiami `AiServiceError`, laiškas pažymimas „Nepavyko analizuoti" ir analizuojamas iš naujo kito tikrinimo metu.
 
 ### Testai
 
 | Failas | Kas tikrinama |
 |---|---|
-| `test/analysis.test.js` | Įprastas atvejis (užsakymas, 50 balų, data 2026-10-16), konfliktas (atnaujinimas, 90 balų, data nekeliama į praeitį), mažas užtikrintumas, AI paslaugos klaida, netinkami AI atsakymai (kategorija, neegzistuojanti data, užtikrintumas, sugadintas JSON), prioriteto ribos, darbo dienos |
+| `test/analysis.test.js` | Įprastas atvejis (užsakymas, 50 balų, data 2026-10-16), konfliktas (atnaujinimas, 90 balų, data nekeliama į praeitį), mažas užtikrintumas, AI paslaugos klaida, netinkami AI atsakymai, prioriteto ribos, darbo dienos |
 | `test/mailboxChecker.test.js` | Viena užduotis gijai, pakartotinis tikrinimas be dublikatų, nepavykusios analizės kartojimas, ištrintos užduoties atkūrimas, atsakymas be veiksmo nekeičia užduoties |
-| `test/tenantIsolation.test.js` | Vienas klientas negali perskaityti kito kliento laiškų, ištrinti jo užduoties, o ta pati gijos ID skirtingiems klientams sukuria atskiras užduotis |
-
-### Tikrų Google paslaugų prijungimas
-
-Gmail ir Google Tasks klientai kuriami `src/server.js` per gamyklas `mockGmailFor(tenant)` ir `tasksClientFor(tenant)`. Norint prijungti tikras paslaugas, pakanka parašyti klasę su tais pačiais metodais ir ją grąžinti iš gamyklos:
-
-| Klientas | Metodai |
-|---|---|
-| Laiškai | `listMessagesSince(isoTime)`, `getMessage(id)`; laiškas: `{ id, threadId, from, subject, body, receivedAt, labels, hasListUnsubscribe }` |
-| Užduotys | `listTasks()`, `taskExists(id)`, `createTask({ title, due, notes })`, `updateTask(id, { title, due })` |
+| `test/tenantIsolation.test.js` | Prisijungęs klientas mato tik savo laiškus ir užduotis, negali ištrinti kito kliento užduoties; be prisijungimo 401; neregistruota Google paskyra atmetama; suklastotas OAuth `state` atmetamas |
+| `test/aiClassifiers.test.js` | Tie patys patikrinimai kiekvienam AI tiekėjui (Gemini, Claude): užklausa su data ir laišku, tuščia data, API klaida, užblokuotas ir nutrūkęs atsakymas, trūkstamas raktas; tiekėjo ir modelio parinkimas (API imituojamos) |
+| `test/googleGmailClient.test.js` | Gmail API laiško pavertimas į sistemos laišką, naujienlaiškio atpažinimas pagal `List-Unsubscribe` |
 
 ### Nukrypimai nuo I etapo plano
 
 | Planuota | Prototipe | Priežastis |
 |---|---|---|
 | PostgreSQL | SQLite (`node:sqlite`) | Paleidimas viena komanda be papildomo serverio. Schema ir unikalumo apribojimai tie patys, keičiasi tik `src/storage` |
-| Gmail ir Google Tasks API, Google prisijungimas | Imituoti klientai su tuo pačiu sąsajos kontraktu | Nereikia Google raktų ir leidimų; prisijungimas numatytas III etapui |
+| Laiškų tikrinimas fone | Tikrinama paspaudus mygtuką, kol naudotojas prisijungęs | Google raktai laikomi tik sesijoje (atmintyje); perkrovus serverį reikia prisijungti iš naujo |
+| Tik Google klientai | Papildomai demonstraciniai klientai su imituotu Gmail ir Tasks | Pavyzdiniai duomenys ir scenarijų atkartojimas be Google paskyrų |
