@@ -1,0 +1,76 @@
+{
+  "azuolo-baldai": [
+    {
+      "id": "18c2f4a1",
+      "threadId": "18c2e9b7",
+      "from": "jonas@gmail.com",
+      "subject": "Stalviršių užsakymas",
+      "body": "Laba diena, norėčiau užsakyti 3 ąžuolinius stalviršius. Ar galėtumėte pristatyti iki spalio 20 d.?",
+      "receivedAt": "2026-10-05T06:14:00.000Z",
+      "labels": ["INBOX", "UNREAD"],
+      "hasListUnsubscribe": false
+    },
+    {
+      "id": "18c2f4b2",
+      "threadId": "18c2f4b2",
+      "from": "naujienos@baldumaterialai.test",
+      "subject": "Spalio akcijos: -30% visam lakui",
+      "body": "Tik šią savaitę visiems lakams taikoma 30% nuolaida.",
+      "receivedAt": "2026-10-05T05:00:00.000Z",
+      "labels": ["INBOX", "CATEGORY_PROMOTIONS"],
+      "hasListUnsubscribe": true
+    },
+    {
+      "id": "18c2f4c3",
+      "threadId": "18c2f4c3",
+      "from": "ruta@imone.test",
+      "subject": "Dėl virtuvės baldų",
+      "body": "Sveiki, kiek kainuoja virtuvės spintelių komplektas pagal individualius matmenis?",
+      "receivedAt": "2026-10-05T07:30:00.000Z",
+      "labels": ["INBOX"],
+      "hasListUnsubscribe": false
+    },
+    {
+      "id": "18c2f4d4",
+      "threadId": "18c2f4d4",
+      "from": "info@azuolobaldai.test",
+      "subject": "Pasiūlymas klientui",
+      "body": "Siunčiu pasiūlymą, kaip ir sutarėme.",
+      "receivedAt": "2026-10-05T08:00:00.000Z",
+      "labels": ["SENT"],
+      "hasListUnsubscribe": false
+    }
+  ],
+  "kirpykla-zirkles": [
+    {
+      "id": "27a1b0e1",
+      "threadId": "27a1b0e1",
+      "from": "apskaita@tiekejas.test",
+      "subject": "Sąskaita faktūra Nr. 1045",
+      "body": "Sveiki, siunčiame sąskaitą už plaukų dažus. Prašome apmokėti iki spalio 9 d.",
+      "receivedAt": "2026-10-05T06:45:00.000Z",
+      "labels": ["INBOX"],
+      "hasListUnsubscribe": false
+    },
+    {
+      "id": "27a1b0f2",
+      "threadId": "27a1b0f2",
+      "from": "notifications@socialnetwork.test",
+      "subject": "Jūsų įrašas sulaukė 12 naujų reakcijų",
+      "body": "Peržiūrėkite, kas sureagavo į jūsų įrašą.",
+      "receivedAt": "2026-10-05T07:10:00.000Z",
+      "labels": ["INBOX", "CATEGORY_SOCIAL"],
+      "hasListUnsubscribe": true
+    },
+    {
+      "id": "27a1b103",
+      "threadId": "27a1b103",
+      "from": "egle@gmail.com",
+      "subject": "Registracija",
+      "body": "Laba diena, ar galėtumėte man paskambinti dėl registracijos kitai savaitei?",
+      "receivedAt": "2026-10-05T09:20:00.000Z",
+      "labels": ["INBOX"],
+      "hasListUnsubscribe": false
+    }
+  ]
+}

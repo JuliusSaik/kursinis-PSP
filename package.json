@@ -1,0 +1,27 @@
+{
+  "name": "piemail",
+  "version": "0.2.0",
+  "description": "PiEmail: important email triage and Google Tasks reminders (prototype)",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "vite build --logLevel warn && node --env-file-if-exists=.env --no-warnings=ExperimentalWarning src/server.js",
+    "dev": "vite",
+    "reset": "node -e \"require('fs').rmSync('data/runtime', { recursive: true, force: true })\"",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "supertest": "^7.3.2",
+    "vite": "^6.4.6",
+    "vitest": "^5.1.0"
+  }
+}
